@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Генератор корпоративного підпису | Промавтоматика</title>
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.10.0/lib/msal-browser.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --pa-orange: rgb(245,61,5);
+    --pa-blue:   rgb(23,147,210);
+    --bg:        #f5f5f3;
+    --surface:   #ffffff;
+    --border:    rgba(0,0,0,0.1);
+    --border-md: rgba(0,0,0,0.18);
+    --text:      #1a1a1a;
+    --muted:     #6b6b6b;
+    --green:     #1d8a4a;
+    --radius:    10px;
+    --radius-sm: 7px;
+  }
+  body { font-family:Arial,Helvetica,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; padding:2rem 1rem; }
+  .page-wrap { max-width:920px; margin:0 auto; }
+  .header { display:flex; align-items:center; gap:16px; margin-bottom:2rem; }
+  .header-logo { width:160px; }
+  .header-text h1 { font-size:20px; font-weight:700; }
+  .header-text p  { font-size:13px; color:var(--muted); margin-top:3px; }
+  .layout { display:grid; grid-template-columns:1fr 1fr; gap:1.25rem; }
+  @media(max-width:680px){ .layout{ grid-template-columns:1fr; } }
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:1.25rem; }
+  .section-label { font-size:10.5px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); margin-bottom:10px; }
+  .seg { display:flex; gap:6px; margin-bottom:1.25rem; }
+  .seg button { flex:1; height:36px; font-size:13px; font-family:Arial,sans-serif; border:1px solid var(--border-md); border-radius:var(--radius-sm); background:#f0f0ee; color:var(--muted); cursor:pointer; transition:all .15s; }
+  .seg button.active { background:var(--surface); border-color:var(--pa-orange); color:var(--pa-orange); font-weight:700; box-shadow:0 0 0 1px var(--pa-orange); }
+  .branch-grid { display:grid; grid-template-columns:1fr 1fr; gap:7px; margin-bottom:1.25rem; }
+  .branch-btn { padding:9px 11px; font-family:Arial,sans-serif; border:1px solid var(--border-md); border-radius:var(--radius-sm); background:#f9f9f8; color:var(--muted); cursor:pointer; text-align:left; transition:all .15s; line-height:1.35; }
+  .branch-btn:hover { border-color:var(--pa-blue); color:var(--text); }
+  .branch-btn.active { background:#e8f5fc; border-color:var(--pa-blue); color:#0a5f8a; }
+  .branch-name { font-size:12.5px; font-weight:700; }
+  .branch-city { font-size:11px; opacity:.75; margin-top:1px; }
+  .fields { display:flex; flex-direction:column; gap:10px; }
+  .field label { display:block; font-size:12px; color:var(--muted); margin-bottom:4px; }
+  .field input { width:100%; height:38px; padding:0 11px; font-size:14px; font-family:Arial,sans-serif; border:1px solid var(--border-md); border-radius:var(--radius-sm); background:#fafaf9; color:var(--text); outline:none; transition:border-color .15s, box-shadow .15s; }
+  .field input:focus { border-color:var(--pa-blue); background:var(--surface); box-shadow:0 0 0 3px rgba(23,147,210,.15); }
+  .preview-shell { background:#e8e8e6; border-radius:var(--radius-sm); padding:1rem; min-height:200px; overflow:auto; margin-bottom:12px; }
+  .preview-doc { background:#fff; display:inline-block; padding:16px; min-width:320px; border-radius:4px; box-shadow:0 1px 4px rgba(0,0,0,.08); }
+  .auth-badge { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--muted); margin-bottom:12px; padding:6px 10px; border:1px solid var(--border-md); border-radius:var(--radius-sm); background:#f9f9f8; }
+  .auth-badge .dot { width:8px; height:8px; border-radius:50%; background:#ccc; flex-shrink:0; }
+  .auth-badge.logged-in .dot { background:var(--green); }
+  .auth-badge.logged-in { border-color:#b8e4c9; background:#f0faf4; color:#1a6635; }
+  .send-btn { display:flex; align-items:center; justify-content:center; gap:8px; width:100%; height:44px; font-size:14px; font-weight:700; font-family:Arial,sans-serif; border:none; border-radius:var(--radius-sm); background:var(--pa-orange); color:#fff; cursor:pointer; transition:all .15s; }
+  .send-btn:hover:not(:disabled) { background:rgb(220,50,0); }
+  .send-btn:active:not(:disabled) { transform:scale(0.98); }
+  .send-btn:disabled { background:#ccc; cursor:not-allowed; }
+  .send-btn.success { background:var(--green); }
+  .status { margin-top:10px; font-size:12px; line-height:1.6; padding:8px 10px; border-radius:0 var(--radius-sm) var(--radius-sm) 0; border-left:3px solid var(--pa-blue); background:#f9f9f8; color:var(--muted); }
+  .status b { color:var(--text); }
+  .status.info    { border-color:var(--pa-blue); background:#f0f8fd; color:#0a5f8a; }
+  .status.success { border-color:var(--green);   background:#f0faf4; color:var(--green); }
+  .status.error   { border-color:var(--pa-orange); background:#fff5f2; color:#a02000; }
+  .footer { margin-top:2rem; text-align:center; font-size:12px; color:var(--muted); }
+  @keyframes spin { to { transform:rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="page-wrap">
+
+  <div class="header">
+    <img class="header-logo" src="https://www.pa.ua/wp-content/uploads/2020/06/logo-sl.svg" alt="Промавтоматика" onerror="this.style.display='none'">
+    <div class="header-text">
+      <h1>Генератор корпоративного підпису</h1>
+      <p>Заповніть дані — лист з готовим шаблоном надійде на вашу пошту</p>
+    </div>
+  </div>
+
+  <div class="layout">
+    <div class="card">
+      <div class="section-label">Тип підпису</div>
+      <div class="seg">
+        <button class="active" id="btn-main" onclick="setType('main')">Основний (з логотипом)</button>
+        <button id="btn-short" onclick="setType('short')">Скорочений</button>
+      </div>
+
+      <div class="section-label">Філія / відділ</div>
+      <div class="branch-grid">
+        <button class="branch-btn active" onclick="setBranch('vn')" id="br-vn"><div class="branch-name">Вінниця</div><div class="branch-city">Хмельницьке шосе 145</div></button>
+        <button class="branch-btn" onclick="setBranch('kv')" id="br-kv"><div class="branch-name">Київ</div><div class="branch-city">Дорогожицька 3</div></button>
+        <button class="branch-btn" onclick="setBranch('km')" id="br-km"><div class="branch-name">Хмельницький</div><div class="branch-city">Свободи 9а</div></button>
+        <button class="branch-btn" onclick="setBranch('lv')" id="br-lv"><div class="branch-name">Львів</div><div class="branch-city">Дорожна 58 В</div></button>
+        <button class="branch-btn" onclick="setBranch('res')" id="br-res"><div class="branch-name">Інтернет-продажі</div><div class="branch-city">res.ua</div></button>
+        <button class="branch-btn" onclick="setBranch('retail')" id="br-retail"><div class="branch-name">Роздрібна торгівля</div><div class="branch-city">Мережа RES</div></button>
+      </div>
+
+      <div class="section-label">Ваші дані</div>
+      <div class="fields">
+        <div class="field"><label>Ім'я та прізвище</label><input id="inp-name" type="text" placeholder="Іван Петренко" oninput="render()"></div>
+        <div class="field"><label>Посада</label><input id="inp-pos" type="text" placeholder="Менеджер з продажів" oninput="render()"></div>
+        <div class="field"><label>Мобільний телефон</label><input id="inp-phone" type="tel" placeholder="+380671234567" oninput="render()"></div>
+        <div class="field"><label>Електронна адреса</label><input id="inp-email" type="email" placeholder="ivan.petrenko@pa.ua" oninput="render()"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-label">Попередній перегляд</div>
+      <div class="preview-shell"><div class="preview-doc" id="preview"></div></div>
+
+      <div class="auth-badge" id="auth-badge">
+        <div class="dot"></div>
+        <span id="auth-label">Не авторизовано</span>
+      </div>
+
+      <button class="send-btn" id="send-btn" onclick="handleSend()">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 8l10-5-4 5 4 5L2 8z" fill="currentColor"/></svg>
+        Надіслати шаблон на мою пошту
+      </button>
+
+      <div class="status" id="status-box">
+        Натисніть кнопку — відкриється вікно входу M365. Після авторизації лист з шаблоном надійде на вашу пошту. Далі <b>Ctrl+C</b> з листа → вставляєте підпис в OWA.
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">ТОВ «Промавтоматика Вінниця» &nbsp;·&nbsp; Внутрішній інструмент IT-відділу</div>
+</div>
+
+<script>
+const MSAL_CONFIG = {
+  auth: {
+    clientId:    '411b6688-4894-402d-85b9-3008e10e46ef',
+    authority:   'https://login.microsoftonline.com/cb1c63fb-0671-4845-a564-a597e42423dc',
+    redirectUri: window.location.href.split('?')[0].split('#')[0],
+  },
+  cache: { cacheLocation: 'sessionStorage' }
+};
+
+const SCOPES = ['Mail.Send', 'User.Read'];
+let msalInstance = null;
+let currentAccount = null;
+
+const PA_LOGO  = 'https://www.pa.ua/wp-content/uploads/2020/06/logo-sl.svg';
+const RES_LOGO = 'https://www.res.ua/local/templates/res_new/images/logo.svg';
+
+const BRANCHES = {
+  vn:     { name:'ТОВ "Промавтоматика Вінниця"',      addr1:'вул. Хмельницьке шосе 145,', addr2:'Вінниця, UA',                      site:'https://www.pa.ua/',  siteText:'www.pa.ua',  logo:PA_LOGO  },
+  kv:     { name:'Промавтоматика Київ',                addr1:'вул. Дорогожицька 3',        addr2:'Київ, UA',                         site:'https://www.pa.ua/',  siteText:'www.pa.ua',  logo:PA_LOGO  },
+  km:     { name:'ТОВ "Промавтоматика Хмельницький"', addr1:'вул. Свободи 9а',            addr2:'м. Хмельницький, UA',              site:'https://www.pa.ua/',  siteText:'www.pa.ua',  logo:PA_LOGO  },
+  lv:     { name:'ТОВ "Промавтоматика Львів"',        addr1:'вул. Дорожна 58 В, Пасіки-Зубрицькі', addr2:'м. Львів, UA',           site:'https://www.pa.ua/',  siteText:'www.pa.ua',  logo:PA_LOGO  },
+  res:    { name:'ТОВ "Промавтоматика Вінниця"',      addr1:'вул. Хмельницьке шосе 145,', addr2:'Вінниця, UA',                      site:'https://www.res.ua/', siteText:'www.res.ua', logo:RES_LOGO },
+  retail: { name:'ТОВ "Промавтоматика Вінниця"',      addr1:'вул. Хмельницьке шосе 145,', addr2:'Вінниця, UA',                      site:'https://www.res.ua/', siteText:'www.res.ua', logo:RES_LOGO },
+};
+
+let sigType = 'main', sigBranch = 'vn';
+
+function setType(t) {
+  sigType = t;
+  document.getElementById('btn-main').classList.toggle('active',  t==='main');
+  document.getElementById('btn-short').classList.toggle('active', t==='short');
+  render();
+}
+
+function setBranch(b) {
+  sigBranch = b;
+  ['vn','kv','km','lv','res','retail'].forEach(k =>
+    document.getElementById('br-'+k).classList.toggle('active', k===b));
+  render();
+}
+
+function buildSignatureHTML() {
+  const name  = document.getElementById('inp-name').value.trim()  || "Ім'я Прізвище";
+  const pos   = document.getElementById('inp-pos').value.trim()   || 'Посада';
+  const phone = document.getElementById('inp-phone').value.trim() || 'ваш мобільний номер телефону (+380...)';
+  const email = document.getElementById('inp-email').value.trim() || 'ваша електронна адреса';
+  const br    = BRANCHES[sigBranch];
+  const isMain = sigType === 'main';
+  const s = 'font-family:Arial,sans-serif;font-size:10pt;color:rgb(44,44,44);margin:0;background-color:white;';
+
+  const addrBlock = isMain
+    ? `<div style="${s}"><b>${br.name}</b></div><div style="${s}">${br.addr1}</div><div style="${s}">${br.addr2}</div><div style="${s}"><br>m: ${phone}</div><div style="${s}">e: ${email}</div>`
+    : `<div style="${s}"><b>${br.name}</b><br>m: ${phone}</div><div style="${s}">e: ${email}</div>`;
+
+  const extraRows = isMain ? `
+    <tr><td colspan="2" style="text-align:left;padding-top:10px;padding-bottom:10px;vertical-align:top;">
+      <div style="${s}"><b><a href="${br.site}" style="color:rgb(245,61,5);text-decoration:none;margin:0;">${br.siteText}</a></b></div>
+    </td></tr>
+    <tr><td colspan="2" style="text-align:left;padding-top:10px;padding-bottom:10px;vertical-align:top;">
+      <a href="${br.site}" style="text-decoration:none;margin:0;">
+        <img src="${br.logo}" width="514" height="98" style="width:514px;height:98px;margin:0;display:block;" />
+      </a>
+    </td></tr>` : '';
+
+  return `<table style="text-align:left;background-color:white;width:515px;color:rgb(36,36,36);box-sizing:border-box;border-collapse:collapse;border-spacing:0;">
+    <tbody>
+      <tr><td colspan="2" style="text-align:left;padding-bottom:10px;vertical-align:top;width:514px;">
+        <div style="font-family:Arial,sans-serif;font-size:14pt;color:rgb(245,61,5);margin:0;"><b>${name}</b></div>
+        <div style="font-family:Arial,sans-serif;font-size:10pt;color:rgb(135,135,135);margin:0;">${pos}</div>
+      </td></tr>
+      <tr><td colspan="2" style="text-align:left;border-top:1px solid rgb(23,147,210);padding-top:10px;vertical-align:top;width:515px;">
+        ${addrBlock}
+      </td></tr>
+      ${extraRows}
+    </tbody>
+  </table>`;
+}
+
+function render() {
+  document.getElementById('preview').innerHTML = buildSignatureHTML();
+}
+
+function setAuthBadge(account) {
+  const badge = document.getElementById('auth-badge');
+  const label = document.getElementById('auth-label');
+  if (account) {
+    badge.classList.add('logged-in');
+    label.textContent = account.username;
+  } else {
+    badge.classList.remove('logged-in');
+    label.textContent = 'Не авторизовано';
+  }
+}
+
+function setStatus(msg, type='') {
+  const box = document.getElementById('status-box');
+  box.innerHTML = msg;
+  box.className = 'status ' + type;
+}
+
+function setBtnState(loading, success) {
+  const btn = document.getElementById('send-btn');
+  btn.disabled = loading;
+  btn.classList.toggle('success', !!success);
+  if (loading) {
+    btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="animation:spin 1s linear infinite"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="2" stroke-dasharray="20" stroke-dashoffset="10"/></svg> Надсилаємо...`;
+  } else if (success) {
+    btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Надіслано!`;
+  } else {
+    btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 8l10-5-4 5 4 5L2 8z" fill="currentColor"/></svg> Надіслати шаблон на мою пошту`;
+  }
+}
+
+async function getToken() {
+  const accounts = msalInstance.getAllAccounts();
+  if (accounts.length > 0) {
+    try {
+      const r = await msalInstance.acquireTokenSilent({ scopes: SCOPES, account: accounts[0] });
+      currentAccount = accounts[0];
+      setAuthBadge(currentAccount);
+      return r.accessToken;
+    } catch(e) {}
+  }
+  const r = await msalInstance.acquireTokenPopup({ scopes: SCOPES });
+  currentAccount = r.account;
+  setAuthBadge(currentAccount);
+  return r.accessToken;
+}
+
+async function sendMail(token, toEmail, sigHtml) {
+  const typeName = sigType === 'main' ? 'Основний' : 'Скорочений';
+  const body = `<html><body style="font-family:Arial,sans-serif;font-size:12pt;color:#1a1a1a;background:#ffffff;">
+<p style="margin:0 0 16px;">Ваш персональний корпоративний підпис (<b>${typeName}</b>) готовий.</p>
+<p style="margin:0 0 8px;font-size:11pt;color:#555;">Як встановити підпис в OWA:</p>
+<ol style="margin:0 0 20px;padding-left:20px;font-size:11pt;color:#333;line-height:1.9;">
+  <li>Виділіть підпис нижче мишкою (від імені до кінця логотипу)</li>
+  <li>Натисніть <b>Ctrl+C</b></li>
+  <li>Відкрийте <b>OWA → Налаштування → Пошта → Підписи</b></li>
+  <li>Натисніть «Створити підпис», введіть назву: <b>${typeName}</b></li>
+  <li>Вставте через <b>Ctrl+V</b> у поле підпису</li>
+  <li>Натисніть «Зберегти»</li>
+</ol>
+<p style="margin:0 0 12px;font-size:11pt;color:#888;border-bottom:1px solid #e0e0e0;padding-bottom:8px;">── Ваш підпис (виділіть і скопіюйте Ctrl+C) ──</p>
+${sigHtml}
+</body></html>`;
+
+  const res = await fetch('https://graph.microsoft.com/v1.0/me/sendMail', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      message: {
+        subject: `Корпоративний підпис — ${typeName}`,
+        importance: 'normal',
+        body: { contentType: 'HTML', content: body },
+        toRecipients: [{ emailAddress: { address: toEmail } }]
+      },
+      saveToSentItems: false
+    })
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error?.message || `HTTP ${res.status}`);
+  }
+}
+
+async function handleSend() {
+  const name  = document.getElementById('inp-name').value.trim();
+  const pos   = document.getElementById('inp-pos').value.trim();
+  const phone = document.getElementById('inp-phone').value.trim();
+  const email = document.getElementById('inp-email').value.trim();
+
+  if (!name || !pos || !phone || !email) {
+    setStatus('⚠ Заповніть усі поля перед відправкою.', 'error');
+    return;
+  }
+
+  setBtnState(true);
+  setStatus('Відкривається вікно входу M365...', 'info');
+
+  try {
+    const token = await getToken();
+    setStatus('Надсилаємо лист...', 'info');
+    await sendMail(token, currentAccount.username, buildSignatureHTML());
+
+    setBtnState(false, true);
+    setStatus(`<b>Лист надіслано на ${currentAccount.username}</b><br>
+      Відкрийте лист → виділіть підпис мишкою → <b>Ctrl+C</b> → в OWA: Налаштування → Пошта → Підписи → Створити → <b>Ctrl+V</b> → Зберегти.`, 'success');
+
+    setTimeout(() => setBtnState(false), 6000);
+
+  } catch(e) {
+    setBtnState(false);
+    const cancelled = e.errorCode === 'user_cancelled' || String(e.message).includes('user_cancelled');
+    setStatus(cancelled ? 'Авторизацію скасовано.' : `Помилка: ${e.message}`, cancelled ? '' : 'error');
+  }
+}
+
+// Init MSAL
+(async () => {
+  msalInstance = new msal.PublicClientApplication(MSAL_CONFIG);
+  await msalInstance.initialize();
+  await msalInstance.handleRedirectPromise().catch(() => {});
+  const accounts = msalInstance.getAllAccounts();
+  if (accounts.length > 0) { currentAccount = accounts[0]; setAuthBadge(currentAccount); }
+  render();
+})();
+</script>
+</body>
+</html>
