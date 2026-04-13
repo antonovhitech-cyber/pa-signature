@@ -116,7 +116,7 @@
       </button>
 
       <div class="status" id="status-box">
-        Натисніть кнопку — відкриється вікно входу M365. Після авторизації лист з шаблоном надійде на вашу пошту. Далі <b>Ctrl+C</b> з листа → вставляєте підпис в OWA.
+        Натисніть кнопку — відкриється вікно входу M365. Після авторизації лист з шаблоном надійде на вашу пошту. Далі <b>Ctrl+C</b> з листа → вставляєте підпис в Outlook Web.
       </div>
     </div>
   </div>
@@ -259,11 +259,11 @@ async function sendMail(token, toEmail, sigHtml) {
   const typeName = sigType === 'main' ? 'Основний' : 'Скорочений';
   const body = `<html><body style="font-family:Arial,sans-serif;font-size:12pt;color:#1a1a1a;background:#ffffff;">
 <p style="margin:0 0 16px;">Ваш персональний корпоративний підпис (<b>${typeName}</b>) готовий.</p>
-<p style="margin:0 0 8px;font-size:11pt;color:#555;">Як встановити підпис в OWA:</p>
+<p style="margin:0 0 8px;font-size:11pt;color:#555;">Як встановити підпис в Outlook Web:</p>
 <ol style="margin:0 0 20px;padding-left:20px;font-size:11pt;color:#333;line-height:1.9;">
   <li>Виділіть підпис нижче мишкою (від імені до кінця логотипу)</li>
   <li>Натисніть <b>Ctrl+C</b></li>
-  <li>Відкрийте <b>OWA → Налаштування → Пошта → Підписи</b></li>
+  <li>Відкрийте <b>Outlook Web → Налаштування → Пошта → Підписи</b></li>
   <li>Натисніть «Створити підпис», введіть назву: <b>${typeName}</b></li>
   <li>Вставте через <b>Ctrl+V</b> у поле підпису</li>
   <li>Натисніть «Зберегти»</li>
@@ -313,7 +313,7 @@ async function handleSend() {
 
     setBtnState(false, true);
     setStatus(`<b>Лист надіслано на ${currentAccount.username}</b><br>
-      Відкрийте лист → виділіть підпис мишкою → <b>Ctrl+C</b> → в OWA: Налаштування → Пошта → Підписи → Створити → <b>Ctrl+V</b> → Зберегти.`, 'success');
+      Відкрийте лист → виділіть підпис мишкою → <b>Ctrl+C</b> → в Outlook Web: Налаштування → Пошта → Підписи → Створити → <b>Ctrl+V</b> → Зберегти.`, 'success');
 
     setTimeout(() => setBtnState(false), 6000);
 
