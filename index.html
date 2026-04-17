@@ -266,6 +266,10 @@ async function sendMail(token, toEmail, sigHtml) {
   <li>Відкрийте <b>Outlook Web → Налаштування → Обліковий запис → Підписи</b></li>
   <li>Натисніть «Створити підпис», введіть назву: <b>${typeName}</b></li>
   <li>Вставте через <b>Ctrl+V</b> у поле підпису</li>
+  ${sigType === 'main'
+    ? `<li>У полі «Для нових повідомлень» оберіть цей підпис зі списку</li>`
+    : `<li>У полі «Для відповідей та пересилань» оберіть цей підпис зі списку</li>`
+  }
   <li>Натисніть «Зберегти»</li>
 </ol>
 <p style="margin:0 0 12px;font-size:11pt;color:#888;border-bottom:1px solid #e0e0e0;padding-bottom:8px;">── Ваш підпис (виділіть і скопіюйте Ctrl+C) ──</p>
